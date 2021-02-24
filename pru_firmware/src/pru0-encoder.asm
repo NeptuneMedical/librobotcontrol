@@ -2,7 +2,7 @@
 ;	26-July-2016
 
 ; pru_0_encoder.p
-; assembly code for counting quadrature encoder signal on inputs R31_14 & 15
+; assembly code for counting quadrature encoder signal on inputs R31_7 & 15
 
 ; Copyright (c) 2015, James Strawson
 ; All rights reserved.
@@ -50,7 +50,7 @@
 ; these pin definitions are specific to SD-101D Robotics Cape
 	.asg	r0,			OLD		; keep last known values of chA and B in memory
 	.asg	r1,			EXOR	; place to store the XOR of old with new AB vals
-	.asg	14,			A
+	.asg	07,			A
 	.asg	15,			B
 
 increment	.macro
