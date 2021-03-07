@@ -79,6 +79,10 @@ static void __check_model(void)
 			current_model = MODEL_BB_BLACK_W_RC;
 			return;
 		}
+		if(strcmp(c, "TI AM335x BeagleBone Black Neptune Cape")==0){
+			current_model = MODEL_BB_BLACK_NEPTUNE;
+			return;
+		}
 		if(strcmp(c, "TI AM335x BeagleBone Green")==0){
 			current_model = MODEL_BB_GREEN;
 			return;
