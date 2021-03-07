@@ -44,6 +44,19 @@
 
 #define MOT_STBY		0,20	//gpio0.20	P9.41/P1.20
 
+// Neptune (motor cape) uses a single direction pin or each motor
+#define MDIR1_CHIP_NEPTUNE    2
+#define MDIR1_PIN_NEPTUNE     1
+
+#define MDIR2_CHIP_NEPTUNE    1
+#define MDIR2_PIN_NEPTUNE     14
+
+#define MDIR3_CHIP_NEPTUNE    0
+#define MDIR3_PIN_NEPTUNE     26
+
+#define MDIR4_CHIP_NEPTUNE    1
+#define MDIR4_PIN_NEPTUNE     29
+
 #define CHANNELS		4
 #define CHANNELS_POCKET		2
 
@@ -95,6 +108,8 @@ int rc_motor_init_freq(int pwm_frequency_hz)
 	pwmss[0]=1;
 	pwmch[0]='A';
 
+
+
 	// motor 2
 	if(rc_model()==MODEL_BB_POCKET) {
 		dirA_chip[1]=MDIR2A_CHIP_POCKET;
@@ -119,7 +134,8 @@ int rc_motor_init_freq(int pwm_frequency_hz)
 	if(rc_model()==MODEL_BB_POCKET) {
 		pwmss[1]=0;
 		pwmch[1]='A';
-	} else {
+	}
+	else {
 		pwmss[1]=1;
 		pwmch[1]='B';
 	}
@@ -132,6 +148,7 @@ int rc_motor_init_freq(int pwm_frequency_hz)
 	pwmss[2]=2;
 	pwmch[2]='A';
 
+
 	// motor 4
 	dirA_chip[3]=MDIR4A_CHIP;
 	dirA_pin[3]=MDIR4A_PIN;
@@ -140,9 +157,35 @@ int rc_motor_init_freq(int pwm_frequency_hz)
 	pwmss[3]=2;
 	pwmch[3]='B';
 
+	// Since for the Neptune (motor) cape, everything is different, let's just
+	// group it all in one if clause and overwrite whatever happened above
+	if(rc_model()==MODEL_BB_BLACK_NEPTUNE) {
+	    fprintf(stderr,"Initializing for custom Neptune cape\n");
+	        dirA_chip[0]=MDIR1_CHIP_NEPTUNE;
+		dirA_pin[0]=MDIR1_PIN_NEPTUNE;
+		pwmss[0]=1;
+		pwmch[0]='B';
+
+		dirA_chip[1]=MDIR2_CHIP_NEPTUNE;
+		dirA_pin[1]=MDIR2_PIN_NEPTUNE;
+		pwmss[1]=1;
+		pwmch[1]='A';
+
+		dirA_chip[2]=MDIR3_CHIP_NEPTUNE;
+		dirA_pin[2]=MDIR3_PIN_NEPTUNE;
+		pwmss[2]=2;
+		pwmch[2]='B';
+
+		dirA_chip[3]=MDIR4_CHIP_NEPTUNE;
+		dirA_pin[3]=MDIR4_PIN_NEPTUNE;
+		pwmss[3]=2;
+		pwmch[3]='A';
+	}
+
+
 	// set up pwm channels
 	if(unlikely(rc_pwm_init(0,pwm_frequency_hz))){
-		fprintf(stderr,"ERROR in rc_motor_init, failed to initialize pwm subsystem 1\n");
+		fprintf(stderr,"ERROR in rc_motor_init, failed to initialize pwm subsystem 0\n");
 		return -1;
 	}
 	if(unlikely(rc_pwm_init(1,pwm_frequency_hz))){
@@ -164,9 +207,11 @@ int rc_motor_init_freq(int pwm_frequency_hz)
 			fprintf(stderr,"ERROR in rc_motor_init, failed to set up gpio %d,%d\n", dirA_chip[i],dirA_pin[i]);
 			return -1;
 		}
-		if(unlikely(rc_gpio_init(dirB_chip[i],dirB_pin[i], GPIOHANDLE_REQUEST_OUTPUT))){
-			fprintf(stderr,"ERROR in rc_motor_init, failed to set up gpio %d,%d\n", dirB_chip[i],dirB_pin[i]);
-			return -1;
+		if(rc_model()!=MODEL_BB_BLACK_NEPTUNE) { // Neptune cape doesn't use dirB
+			if(unlikely(rc_gpio_init(dirB_chip[i],dirB_pin[i], GPIOHANDLE_REQUEST_OUTPUT))){
+				fprintf(stderr,"ERROR in rc_motor_init, failed to set up gpio %d,%d\n", dirB_chip[i],dirB_pin[i]);
+				return -1;
+		}
 		}
 	}
 
@@ -202,7 +247,9 @@ int rc_motor_cleanup(void)
 	rc_gpio_cleanup(MOT_STBY);
 	for(i=0;i<channels;i++){
 		rc_gpio_cleanup(dirA_chip[i],dirA_pin[i]);
-		rc_gpio_cleanup(dirB_chip[i],dirB_pin[i]);
+		if(rc_model()!=MODEL_BB_BLACK_NEPTUNE) { // Neptune cape doesn't use dirB
+			rc_gpio_cleanup(dirB_chip[i],dirB_pin[i]);
+		}
 	}
 	return 0;
 }
@@ -270,9 +317,11 @@ int rc_motor_set(int motor, double duty)
 		fprintf(stderr,"ERROR in rc_motor_set, failed to write to gpio pin %d,%d\n",dirA_chip[motor-1],dirA_pin[motor-1]);
 		return -1;
 	}
-	if(unlikely(rc_gpio_set_value(dirB_chip[motor-1],dirB_pin[motor-1], b))){
-		fprintf(stderr,"ERROR in rc_motor_set, failed to write to gpio pin %d,%d\n",dirB_chip[motor-1],dirB_pin[motor-1]);
-		return -1;
+	if(rc_model()!=MODEL_BB_BLACK_NEPTUNE) { // Neptune cape doesn't use dirB
+		if(unlikely(rc_gpio_set_value(dirB_chip[motor-1],dirB_pin[motor-1], b))){
+			fprintf(stderr,"ERROR in rc_motor_set, failed to write to gpio pin %d,%d\n",dirB_chip[motor-1],dirB_pin[motor-1]);
+			return -1;
+		}
 	}
 	if(unlikely(rc_pwm_set_duty(pwmss[motor-1], pwmch[motor-1], duty))){
 		fprintf(stderr,"ERROR in rc_motor_set, failed to write to pwm %d%c\n",pwmss[motor-1], pwmch[motor-1]);
@@ -309,9 +358,11 @@ int rc_motor_free_spin(int motor)
 		fprintf(stderr,"ERROR in rc_motor_free_spin, failed to write to gpio pin %d,%d\n",dirA_chip[motor-1],dirA_pin[motor-1]);
 		return -1;
 	}
-	if(unlikely(rc_gpio_set_value(dirB_chip[motor-1],dirB_pin[motor-1], 0))){
-		fprintf(stderr,"ERROR in rc_motor_free_spin, failed to write to gpio pin %d,%d\n",dirB_chip[motor-1],dirB_pin[motor-1]);
-		return -1;
+	if(rc_model()!=MODEL_BB_BLACK_NEPTUNE) { // Neptune cape doesn't use dirB
+		if(unlikely(rc_gpio_set_value(dirB_chip[motor-1],dirB_pin[motor-1], 0))){
+			fprintf(stderr,"ERROR in rc_motor_free_spin, failed to write to gpio pin %d,%d\n",dirB_chip[motor-1],dirB_pin[motor-1]);
+			return -1;
+		}
 	}
 	if(unlikely(rc_pwm_set_duty(pwmss[motor-1], pwmch[motor-1], 0.0))){
 		fprintf(stderr,"ERROR in rc_motor_free_spin, failed to write to pwm %d%c\n",pwmss[motor-1], pwmch[motor-1]);
@@ -348,9 +399,11 @@ int rc_motor_brake(int motor)
 		fprintf(stderr,"ERROR in rc_motor_brake, failed to write to gpio pin %d,%d\n",dirA_chip[motor-1],dirA_pin[motor-1]);
 		return -1;
 	}
-	if(unlikely(rc_gpio_set_value(dirB_chip[motor-1],dirB_pin[motor-1], 1))){
-		fprintf(stderr,"ERROR in rc_motor_brake, failed to write to gpio pin %d,%d\n",dirB_chip[motor-1],dirB_pin[motor-1]);
-		return -1;
+	if(rc_model()!=MODEL_BB_BLACK_NEPTUNE) { // Neptune cape doesn't use dirB
+		if(unlikely(rc_gpio_set_value(dirB_chip[motor-1],dirB_pin[motor-1], 1))){
+			fprintf(stderr,"ERROR in rc_motor_brake, failed to write to gpio pin %d,%d\n",dirB_chip[motor-1],dirB_pin[motor-1]);
+			return -1;
+		}
 	}
 	if(unlikely(rc_pwm_set_duty(pwmss[motor-1], pwmch[motor-1], 0.0))){
 		fprintf(stderr,"ERROR in rc_motor_brake, failed to write to pwm %d%c\n",pwmss[motor-1], pwmch[motor-1]);
